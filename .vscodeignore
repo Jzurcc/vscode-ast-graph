@@ -1,3 +1,5 @@
+dist/*.map
+dist/test.js
 .vscode/**
 src/**
 test/**
