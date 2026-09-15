@@ -75,7 +75,9 @@ export class WebviewPanelManager {
     }
 
     if (this.session && this.bridge) {
-      const result = this.session.loadSource(sourceCode);
+      const fileName = activeEditor?.document.fileName ?? 'source.toy';
+      const languageId = activeEditor?.document.languageId ?? 'toy';
+      const result = this.session.loadSource(sourceCode, fileName, languageId);
       if (result) {
         this.bridge.postMessage({
           type: 'INIT_PROGRAM',

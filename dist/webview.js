@@ -279,6 +279,8 @@
   .cat-badge.Literal, .cat-badge.LITERAL { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; }
   .cat-badge.Ident, .cat-badge.IDENT { background: rgba(251, 191, 36, 0.2); color: #fde047; }
   .cat-badge.Fn, .cat-badge.FN { background: rgba(192, 132, 252, 0.2); color: #d8b4fe; }
+  .cat-badge.Type { background: rgba(45, 212, 191, 0.2); color: #5eead4; }
+  .cat-badge.Module { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
 
   .node-label-text {
     font-family: var(--font-mono);
@@ -610,8 +612,8 @@
       let currentRowIndex = 0;
       const traverse = (node, depth, slot, parentIndex) => {
         const rowIndex = currentRowIndex++;
-        const category = this.getCategory(node);
-        const label = this.getLabel(node);
+        const category = node.category ?? this.getCategory(node);
+        const label = node.label ?? this.getLabel(node);
         const railIndex = depth;
         rows.push({
           id: `row-${rowIndex}`,
@@ -626,7 +628,7 @@
           node,
           loc: node.loc
         });
-        const children = this.getChildEntries(node);
+        const children = Array.isArray(node.children) ? node.children.map((c) => ({ node: c, slot: c.slot || "child" })) : this.getChildEntries(node);
         for (const child of children) {
           traverse(child.node, depth + 1, child.slot, rowIndex);
         }

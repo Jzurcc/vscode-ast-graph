@@ -2,6 +2,7 @@ import { Lexer } from '../domain/lexer/Lexer';
 import { Token } from '../domain/lexer/Token';
 import { Parser } from '../domain/parser/Parser';
 import { TreeWalkEngine } from '../domain/interpreter/TreeWalkEngine';
+import { TypeScriptAstAdapter } from '../domain/parser/TypeScriptAstAdapter';
 import { ProgramNode } from '../shared/AstNodeTypes';
 import { StepSnapshot } from '../shared/StepSnapshot';
 import { SnapshotHistory } from './SnapshotHistory';
@@ -14,7 +15,7 @@ export interface SessionListeners {
 }
 
 export class InterpreterSession {
-  private program: ProgramNode | null = null;
+  private program: any = null;
   private history: SnapshotHistory = new SnapshotHistory();
   private isPlaying = false;
   private playTimer: NodeJS.Timeout | null = null;
@@ -25,10 +26,40 @@ export class InterpreterSession {
     this.listeners = listeners;
   }
 
-  public loadSource(source: string): { ast: ProgramNode; tokens: Token[]; snapshots: StepSnapshot[]; executionTimeMs: number } | null {
+  public loadSource(
+    source: string,
+    fileName = 'source.toy',
+    languageId = 'toy'
+  ): { ast: any; tokens: Token[]; snapshots: StepSnapshot[]; executionTimeMs: number } | null {
     this.stopPlayback();
     const startTime = performance.now();
+
+    const isJsOrTs =
+      languageId === 'javascript' ||
+      languageId === 'typescript' ||
+      languageId === 'javascriptreact' ||
+      languageId === 'typescriptreact' ||
+      fileName.endsWith('.js') ||
+      fileName.endsWith('.jsx') ||
+      fileName.endsWith('.ts') ||
+      fileName.endsWith('.tsx') ||
+      fileName.endsWith('.mjs') ||
+      fileName.endsWith('.cjs');
+
     try {
+      if (isJsOrTs) {
+        const result = TypeScriptAstAdapter.parse(source, fileName);
+        this.program = result.ast;
+        this.history = new SnapshotHistory([]);
+        return {
+          ast: result.ast,
+          tokens: result.tokens,
+          snapshots: [],
+          executionTimeMs: result.executionTimeMs,
+        };
+      }
+
+      // Default to built-in Toy language with stepping execution
       const lexer = new Lexer(source);
       const tokens = lexer.tokenize();
       const parser = new Parser(tokens);

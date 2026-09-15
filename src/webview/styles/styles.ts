@@ -276,6 +276,8 @@ export const APP_STYLES = `
   .cat-badge.Literal, .cat-badge.LITERAL { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; }
   .cat-badge.Ident, .cat-badge.IDENT { background: rgba(251, 191, 36, 0.2); color: #fde047; }
   .cat-badge.Fn, .cat-badge.FN { background: rgba(192, 132, 252, 0.2); color: #d8b4fe; }
+  .cat-badge.Type { background: rgba(45, 212, 191, 0.2); color: #5eead4; }
+  .cat-badge.Module { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
 
   .node-label-text {
     font-family: var(--font-mono);

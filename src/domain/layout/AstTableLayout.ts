@@ -7,11 +7,11 @@ export interface AstTableRow {
   rowIndex: number;
   depth: number;
   slot: string;
-  category: 'Stmt' | 'Expr' | 'Literal' | 'Ident' | 'Fn';
+  category: 'Stmt' | 'Expr' | 'Literal' | 'Ident' | 'Fn' | 'Type' | 'Module';
   label: string;
   parentRowIndex: number;
   railIndex: number;
-  node: ASTNode;
+  node: any;
   loc: SourceLocation;
 }
 
@@ -35,14 +35,14 @@ export class AstTableLayout {
   public static readonly RAIL_SPACING = 16;
   public static readonly RAIL_OFFSET_X = 20;
 
-  public static flattenAst(program: ProgramNode): AstTableRow[] {
+  public static flattenAst(program: any): AstTableRow[] {
     const rows: AstTableRow[] = [];
     let currentRowIndex = 0;
 
-    const traverse = (node: ASTNode, depth: number, slot: string, parentIndex: number): void => {
+    const traverse = (node: any, depth: number, slot: string, parentIndex: number): void => {
       const rowIndex = currentRowIndex++;
-      const category = this.getCategory(node);
-      const label = this.getLabel(node);
+      const category = node.category ?? this.getCategory(node);
+      const label = node.label ?? this.getLabel(node);
       const railIndex = depth;
 
       rows.push({
@@ -59,7 +59,10 @@ export class AstTableLayout {
         loc: node.loc,
       });
 
-      const children = this.getChildEntries(node);
+      const children: Array<{ node: any; slot: string }> = Array.isArray(node.children)
+        ? node.children.map((c: any) => ({ node: c, slot: c.slot || 'child' }))
+        : this.getChildEntries(node);
+
       for (const child of children) {
         traverse(child.node, depth + 1, child.slot, rowIndex);
       }
