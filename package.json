@@ -1,0 +1,67 @@
+{
+  "name": "ast-graph",
+  "displayName": "AST Graph",
+  "description": "Interactive Git Graph style AST visualizer and time-traveling tree-walk interpreter.",
+  "version": "0.1.0",
+  "publisher": "Jzurcc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jzurcc/vscode-ast-graph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jzurcc/vscode-ast-graph/issues"
+  },
+  "homepage": "https://github.com/Jzurcc/vscode-ast-graph#readme",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Programming Languages",
+    "Education"
+  ],
+  "activationEvents": [
+    "onCommand:astGraph.view",
+    "onCommand:astVisualizer.open"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "astGraph.view",
+        "title": "AST Graph: View AST Graph",
+        "category": "AST Graph",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "astGraph.view",
+          "group": "navigation"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "toy",
+        "aliases": ["Toy Language", "toy"],
+        "extensions": [".toy"]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "node esbuild.js --production",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "node --test dist/test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.3"
+  }
+}

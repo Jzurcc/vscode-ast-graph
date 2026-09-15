@@ -1,0 +1,14 @@
+// Factorial and Accumulator Demo in Toy Language
+let n = 4;
+let result = 1;
+
+fn factorial(num) {
+  if (num <= 1) {
+    return 1;
+  }
+  return num * factorial(num - 1);
+}
+
+result = factorial(n);
+print("Factorial of 4 is:");
+print(result);
