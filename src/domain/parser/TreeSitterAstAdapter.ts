@@ -46,6 +46,9 @@ export class TreeSitterAstAdapter {
 
       for (let i = 0; i < count; i++) {
         const child = node.namedChildCount > 0 ? node.namedChild(i)! : node.child(i)!;
+        if (child.type.toLowerCase().includes('comment')) {
+          continue;
+        }
         const fieldName = node.fieldNameForChild(i);
         const childSlot = fieldName ?? (node.namedChildCount > 0 ? `child[${i}]` : `token[${i}]`);
         children.push(convert(child, childSlot));
@@ -271,6 +274,9 @@ export class TreeSitterAstAdapter {
   }
 
   private static extractTokens(node: Parser.SyntaxNode, tokens: Token[]): void {
+    if (node.type.toLowerCase().includes('comment')) {
+      return;
+    }
     if (node.childCount === 0) {
       const text = node.text.trim();
       if (text.length > 0) {

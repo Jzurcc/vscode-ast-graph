@@ -4,6 +4,7 @@ import { Parser } from '../domain/parser/Parser';
 import { TreeWalkEngine } from '../domain/interpreter/TreeWalkEngine';
 import { TypeScriptAstAdapter } from '../domain/parser/TypeScriptAstAdapter';
 import { TreeSitterAstAdapter } from '../domain/parser/TreeSitterAstAdapter';
+import { AstTraversalStepper } from '../domain/interpreter/AstTraversalStepper';
 import { ProgramNode } from '../shared/AstNodeTypes';
 import { StepSnapshot } from '../shared/StepSnapshot';
 import { SnapshotHistory } from './SnapshotHistory';
@@ -51,11 +52,16 @@ export class InterpreterSession {
       if (isJsOrTs) {
         const result = TypeScriptAstAdapter.parse(source, fileName);
         this.program = result.ast;
-        this.history = new SnapshotHistory([]);
+        const snapshots = AstTraversalStepper.generateSteps(result.ast);
+        this.history = new SnapshotHistory(snapshots);
+        const initial = this.history.getCurrent();
+        if (initial) {
+          this.listeners.onStepChanged(initial, 0, snapshots.length);
+        }
         return {
           ast: result.ast,
           tokens: result.tokens,
-          snapshots: [],
+          snapshots,
           executionTimeMs: result.executionTimeMs,
         };
       }
@@ -63,11 +69,16 @@ export class InterpreterSession {
       if (TreeSitterAstAdapter.isSupported(languageId, fileName)) {
         const result = await TreeSitterAstAdapter.parse(source, languageId, fileName);
         this.program = result.ast;
-        this.history = new SnapshotHistory([]);
+        const snapshots = AstTraversalStepper.generateSteps(result.ast);
+        this.history = new SnapshotHistory(snapshots);
+        const initial = this.history.getCurrent();
+        if (initial) {
+          this.listeners.onStepChanged(initial, 0, snapshots.length);
+        }
         return {
           ast: result.ast,
           tokens: result.tokens,
-          snapshots: [],
+          snapshots,
           executionTimeMs: result.executionTimeMs,
         };
       }

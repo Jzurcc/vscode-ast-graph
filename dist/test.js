@@ -213247,6 +213247,9 @@ var TreeSitterAstAdapter = class {
       const count = node.namedChildCount > 0 ? node.namedChildCount : node.childCount;
       for (let i2 = 0; i2 < count; i2++) {
         const child = node.namedChildCount > 0 ? node.namedChild(i2) : node.child(i2);
+        if (child.type.toLowerCase().includes("comment")) {
+          continue;
+        }
         const fieldName = node.fieldNameForChild(i2);
         const childSlot = fieldName ?? (node.namedChildCount > 0 ? `child[${i2}]` : `token[${i2}]`);
         children.push(convert(child, childSlot));
@@ -213382,6 +213385,9 @@ var TreeSitterAstAdapter = class {
     return type.replace(/_/g, " ");
   }
   static extractTokens(node, tokens) {
+    if (node.type.toLowerCase().includes("comment")) {
+      return;
+    }
     if (node.childCount === 0) {
       const text = node.text.trim();
       if (text.length > 0) {
@@ -213594,6 +213600,61 @@ var AstTableLayout = class {
   }
 };
 
+// src/domain/interpreter/AstTraversalStepper.ts
+var AstTraversalStepper = class {
+  static generateSteps(ast) {
+    const rows = AstTableLayout.flattenAst(ast);
+    if (!rows || rows.length === 0) {
+      return [];
+    }
+    const snapshots = [];
+    const discoveredSymbols = {};
+    rows.forEach((row, index) => {
+      if (row.category === "Fn") {
+        discoveredSymbols[row.label] = "function";
+      } else if (row.category === "Type") {
+        discoveredSymbols[row.label] = "type/class";
+      } else if (row.category === "Ident" && row.label.length < 30) {
+        if (!discoveredSymbols[row.label]) {
+          discoveredSymbols[row.label] = "symbol";
+        }
+      }
+      const scopes = [
+        {
+          scopeId: "ast_node",
+          name: "Active AST Node",
+          bindings: {
+            "Node Type": row.type,
+            "Category": row.category,
+            "Slot": row.slot,
+            "Label": row.label,
+            "Location": `Line ${row.loc.start.line}, Col ${row.loc.start.column}`
+          }
+        }
+      ];
+      if (Object.keys(discoveredSymbols).length > 0) {
+        scopes.push({
+          scopeId: "ast_symbols",
+          name: "Discovered Symbols",
+          bindings: { ...discoveredSymbols }
+        });
+      }
+      snapshots.push({
+        stepIndex: index,
+        eventType: "ENTER",
+        nodeId: row.nodeId,
+        nodeType: row.type,
+        description: `${row.category} ${row.type}: ${row.label} (${row.slot})`,
+        loc: row.loc,
+        resultValue: row.category === "Literal" ? row.label : void 0,
+        scopes,
+        stdoutHistory: []
+      });
+    });
+    return snapshots;
+  }
+};
+
 // src/application/SnapshotHistory.ts
 var SnapshotHistory = class {
   snapshots;
@@ -213669,22 +213730,32 @@ var InterpreterSession = class {
       if (isJsOrTs) {
         const result = TypeScriptAstAdapter.parse(source, fileName);
         this.program = result.ast;
-        this.history = new SnapshotHistory([]);
+        const snapshots = AstTraversalStepper.generateSteps(result.ast);
+        this.history = new SnapshotHistory(snapshots);
+        const initial2 = this.history.getCurrent();
+        if (initial2) {
+          this.listeners.onStepChanged(initial2, 0, snapshots.length);
+        }
         return {
           ast: result.ast,
           tokens: result.tokens,
-          snapshots: [],
+          snapshots,
           executionTimeMs: result.executionTimeMs
         };
       }
       if (TreeSitterAstAdapter.isSupported(languageId, fileName)) {
         const result = await TreeSitterAstAdapter.parse(source, languageId, fileName);
         this.program = result.ast;
-        this.history = new SnapshotHistory([]);
+        const snapshots = AstTraversalStepper.generateSteps(result.ast);
+        this.history = new SnapshotHistory(snapshots);
+        const initial2 = this.history.getCurrent();
+        if (initial2) {
+          this.listeners.onStepChanged(initial2, 0, snapshots.length);
+        }
         return {
           ast: result.ast,
           tokens: result.tokens,
-          snapshots: [],
+          snapshots,
           executionTimeMs: result.executionTimeMs
         };
       }
@@ -213863,11 +213934,13 @@ export function Counter({ initial = 0 }: Props) {
   console.log(`TypeScript & TSX tests passed: parsed ${tsRows.length} AST rows and ${tsRails.length} rails.`);
   console.log("\n--- 6. Tree-sitter Python AST Parsing Test ---");
   const pythonCode = `
+# Module level comment to ignore
 import math
 
 class Calculator:
+    # Class docstring/comment
     def __init__(self, precision: int = 2):
-        self.precision = precision
+        self.precision = precision # inline comment
 
     def hypotenuse(self, a: float, b: float) -> float:
         return round(math.sqrt(a ** 2 + b ** 2), self.precision)
@@ -213880,6 +213953,10 @@ print(calc.hypotenuse(3.0, 4.0))
   import_node_assert.default.strictEqual(pyResult.ast.type, "module");
   (0, import_node_assert.default)(pyResult.tokens.length > 15, "Expected tokens to be extracted from Python source");
   (0, import_node_assert.default)(pyResult.ast.children.length >= 3, "Expected import, class, and statement nodes");
+  const commentNodes = pyResult.ast.children.filter((c) => c.type.includes("comment"));
+  import_node_assert.default.strictEqual(commentNodes.length, 0, "Expected no comment nodes in AST");
+  const commentTokens = pyResult.tokens.filter((t) => t.lexeme.startsWith("#"));
+  import_node_assert.default.strictEqual(commentTokens.length, 0, "Expected no comment tokens in token stream");
   const pyRows = AstTableLayout.flattenAst(pyResult.ast);
   (0, import_node_assert.default)(pyRows.length > 10, "Expected flattened rows from Python AST");
   const pyCategories = new Set(pyRows.map((r) => r.category));
@@ -213888,11 +213965,13 @@ print(calc.hypotenuse(3.0, 4.0))
   (0, import_node_assert.default)(pyCategories.has("Fn"), "Expected Fn category in Python for functions");
   const pyRails = AstTableLayout.computeRails(pyRows);
   (0, import_node_assert.default)(pyRails.length > 0, "Expected SVG rails for Python AST");
-  console.log(`Python AST test passed: parsed ${pyRows.length} rows and ${pyRails.length} rails (${pyResult.executionTimeMs}ms).`);
+  console.log(`Python AST test passed: parsed ${pyRows.length} rows (comments ignored) and ${pyRails.length} rails (${pyResult.executionTimeMs}ms).`);
   console.log("\n--- 7. Tree-sitter C AST Parsing Test ---");
   const cCode = `
+// Standard I/O include
 #include <stdio.h>
 
+/* Compute factorial */
 int factorial(int n) {
     if (n <= 1) return 1;
     return n * factorial(n - 1);
@@ -213933,9 +214012,15 @@ namespace DemoApp {
   const csRails = AstTableLayout.computeRails(csRows);
   (0, import_node_assert.default)(csRails.length > 0, "Expected rails for C# AST");
   console.log(`C# AST test passed: parsed ${csRows.length} rows and ${csRails.length} rails (${csResult.executionTimeMs}ms).`);
-  console.log("\n--- 9. Multi-Language Session Routing Test ---");
+  console.log("\n--- 9. Multi-Language Session Routing & Traversal Stepping Test ---");
+  let latestSessionSnapshot = null;
+  let lastStepIndex = -1;
+  let lastTotalSteps = -1;
   const session = new InterpreterSession({
-    onStepChanged: () => {
+    onStepChanged: (snap, idx, total) => {
+      latestSessionSnapshot = snap;
+      lastStepIndex = idx;
+      lastTotalSteps = total;
     },
     onPlayStateChanged: () => {
     },
@@ -213946,19 +214031,28 @@ namespace DemoApp {
   const jsResult = await session.loadSource("const x = [1, 2, 3].map(n => n * 2);", "test.js", "javascript");
   (0, import_node_assert.default)(jsResult !== null);
   import_node_assert.default.strictEqual(jsResult.ast.type, "SourceFile");
-  import_node_assert.default.strictEqual(jsResult.snapshots.length, 0);
-  const pySessionResult = await session.loadSource('def greet(name):\n    return f"Hello, {name}"', "test.py", "python");
+  (0, import_node_assert.default)(jsResult.snapshots.length > 0, "Expected AST traversal steps for JavaScript");
+  import_node_assert.default.strictEqual(lastStepIndex, 0);
+  import_node_assert.default.strictEqual(lastTotalSteps, jsResult.snapshots.length);
+  const pySessionResult = await session.loadSource('def greet(name):\n    # say hello\n    return f"Hello, {name}"', "test.py", "python");
   (0, import_node_assert.default)(pySessionResult !== null);
   import_node_assert.default.strictEqual(pySessionResult.ast.type, "module");
-  import_node_assert.default.strictEqual(pySessionResult.snapshots.length, 0);
+  (0, import_node_assert.default)(pySessionResult.snapshots.length > 0, "Expected AST traversal steps for Python");
+  import_node_assert.default.strictEqual(lastStepIndex, 0);
+  (0, import_node_assert.default)(latestSessionSnapshot !== null);
+  (0, import_node_assert.default)(latestSessionSnapshot.scopes.length > 0, "Expected active AST node scope frame");
+  session.stepForward();
+  import_node_assert.default.strictEqual(lastStepIndex, 1);
+  (0, import_node_assert.default)(latestSessionSnapshot.nodeId.length > 0);
   const csSessionResult = await session.loadSource("class Foo { int Bar = 42; }", "test.cs", "csharp");
   (0, import_node_assert.default)(csSessionResult !== null);
   import_node_assert.default.strictEqual(csSessionResult.ast.type, "compilation_unit");
+  (0, import_node_assert.default)(csSessionResult.snapshots.length > 0, "Expected AST traversal steps for C#");
   const toyResult = await session.loadSource("let y = 10; print(y);", "test.toy", "toy");
   (0, import_node_assert.default)(toyResult !== null);
   import_node_assert.default.strictEqual(toyResult.ast.type, "Program");
   (0, import_node_assert.default)(toyResult.snapshots.length > 0);
-  console.log("Session multi-language routing passed.");
+  console.log("Session multi-language routing and AST traversal stepping passed.");
   console.log("\nALL TESTS PASSED SUCCESSFULLY!\n");
 }
 runAllTests().catch((err2) => {

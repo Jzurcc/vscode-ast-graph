@@ -167,6 +167,9 @@ class WebviewApp {
   }
 
   private getChildren(node: ASTNode): ASTNode[] {
+    if ((node as any).children && Array.isArray((node as any).children)) {
+      return (node as any).children;
+    }
     switch (node.type) {
       case 'Program': return node.body;
       case 'VariableDeclaration': return [node.initializer];

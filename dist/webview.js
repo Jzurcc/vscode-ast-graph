@@ -1352,6 +1352,9 @@
       return path.length > 0 ? path : ["Program"];
     }
     getChildren(node) {
+      if (node.children && Array.isArray(node.children)) {
+        return node.children;
+      }
       switch (node.type) {
         case "Program":
           return node.body;

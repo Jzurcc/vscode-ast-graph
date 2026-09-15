@@ -115,14 +115,16 @@ export function Counter({ initial = 0 }: Props) {
   assert(tsRails.length > 0, 'Expected SVG rails to be computed for TSX AST');
   console.log(`TypeScript & TSX tests passed: parsed ${tsRows.length} AST rows and ${tsRails.length} rails.`);
 
-  // 6. Tree-sitter Python AST Adapter Test
+  // 6. Tree-sitter Python AST Adapter Test (with comments ignored)
   console.log('\n--- 6. Tree-sitter Python AST Parsing Test ---');
   const pythonCode = `
+# Module level comment to ignore
 import math
 
 class Calculator:
+    # Class docstring/comment
     def __init__(self, precision: int = 2):
-        self.precision = precision
+        self.precision = precision # inline comment
 
     def hypotenuse(self, a: float, b: float) -> float:
         return round(math.sqrt(a ** 2 + b ** 2), self.precision)
@@ -137,6 +139,12 @@ print(calc.hypotenuse(3.0, 4.0))
   assert(pyResult.tokens.length > 15, 'Expected tokens to be extracted from Python source');
   assert(pyResult.ast.children.length >= 3, 'Expected import, class, and statement nodes');
 
+  // Verify comments are filtered out
+  const commentNodes = pyResult.ast.children.filter(c => c.type.includes('comment'));
+  assert.strictEqual(commentNodes.length, 0, 'Expected no comment nodes in AST');
+  const commentTokens = pyResult.tokens.filter(t => t.lexeme.startsWith('#'));
+  assert.strictEqual(commentTokens.length, 0, 'Expected no comment tokens in token stream');
+
   const pyRows = AstTableLayout.flattenAst(pyResult.ast);
   assert(pyRows.length > 10, 'Expected flattened rows from Python AST');
   const pyCategories = new Set(pyRows.map(r => r.category));
@@ -146,13 +154,15 @@ print(calc.hypotenuse(3.0, 4.0))
 
   const pyRails = AstTableLayout.computeRails(pyRows);
   assert(pyRails.length > 0, 'Expected SVG rails for Python AST');
-  console.log(`Python AST test passed: parsed ${pyRows.length} rows and ${pyRails.length} rails (${pyResult.executionTimeMs}ms).`);
+  console.log(`Python AST test passed: parsed ${pyRows.length} rows (comments ignored) and ${pyRails.length} rails (${pyResult.executionTimeMs}ms).`);
 
   // 7. Tree-sitter C / C++ AST Adapter Test
   console.log('\n--- 7. Tree-sitter C AST Parsing Test ---');
   const cCode = `
+// Standard I/O include
 #include <stdio.h>
 
+/* Compute factorial */
 int factorial(int n) {
     if (n <= 1) return 1;
     return n * factorial(n - 1);
@@ -200,37 +210,56 @@ namespace DemoApp {
   assert(csRails.length > 0, 'Expected rails for C# AST');
   console.log(`C# AST test passed: parsed ${csRows.length} rows and ${csRails.length} rails (${csResult.executionTimeMs}ms).`);
 
-  // 9. Multi-Language InterpreterSession Routing Test
-  console.log('\n--- 9. Multi-Language Session Routing Test ---');
+  // 9. Multi-Language InterpreterSession Routing & AST Traversal Stepping Test
+  console.log('\n--- 9. Multi-Language Session Routing & Traversal Stepping Test ---');
+  let latestSessionSnapshot: any = null;
+  let lastStepIndex = -1;
+  let lastTotalSteps = -1;
+
   const session = new InterpreterSession({
-    onStepChanged: () => {},
+    onStepChanged: (snap, idx, total) => {
+      latestSessionSnapshot = snap;
+      lastStepIndex = idx;
+      lastTotalSteps = total;
+    },
     onPlayStateChanged: () => {},
     onError: (err) => { throw new Error(err); },
   });
 
-  // JS/TS routing
+  // JS/TS routing with traversal stepping
   const jsResult = await session.loadSource('const x = [1, 2, 3].map(n => n * 2);', 'test.js', 'javascript');
   assert(jsResult !== null);
   assert.strictEqual(jsResult.ast.type, 'SourceFile');
-  assert.strictEqual(jsResult.snapshots.length, 0);
+  assert(jsResult.snapshots.length > 0, 'Expected AST traversal steps for JavaScript');
+  assert.strictEqual(lastStepIndex, 0);
+  assert.strictEqual(lastTotalSteps, jsResult.snapshots.length);
 
-  // Python routing
-  const pySessionResult = await session.loadSource('def greet(name):\n    return f"Hello, {name}"', 'test.py', 'python');
+  // Python routing with traversal stepping
+  const pySessionResult = await session.loadSource('def greet(name):\n    # say hello\n    return f"Hello, {name}"', 'test.py', 'python');
   assert(pySessionResult !== null);
   assert.strictEqual(pySessionResult.ast.type, 'module');
-  assert.strictEqual(pySessionResult.snapshots.length, 0);
+  assert(pySessionResult.snapshots.length > 0, 'Expected AST traversal steps for Python');
+  assert.strictEqual(lastStepIndex, 0);
+  assert(latestSessionSnapshot !== null);
+  assert(latestSessionSnapshot.scopes.length > 0, 'Expected active AST node scope frame');
 
-  // C# routing
+  // Test stepping controls on Python AST
+  session.stepForward();
+  assert.strictEqual(lastStepIndex, 1);
+  assert(latestSessionSnapshot.nodeId.length > 0);
+
+  // C# routing with traversal stepping
   const csSessionResult = await session.loadSource('class Foo { int Bar = 42; }', 'test.cs', 'csharp');
   assert(csSessionResult !== null);
   assert.strictEqual(csSessionResult.ast.type, 'compilation_unit');
+  assert(csSessionResult.snapshots.length > 0, 'Expected AST traversal steps for C#');
 
   // Toy language stepping execution routing
   const toyResult = await session.loadSource('let y = 10; print(y);', 'test.toy', 'toy');
   assert(toyResult !== null);
   assert.strictEqual(toyResult.ast.type, 'Program');
   assert(toyResult.snapshots.length > 0);
-  console.log('Session multi-language routing passed.');
+  console.log('Session multi-language routing and AST traversal stepping passed.');
 
   console.log('\nALL TESTS PASSED SUCCESSFULLY!\n');
 }
