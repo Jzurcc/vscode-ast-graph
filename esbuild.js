@@ -26,6 +26,31 @@ const esbuildProblemMatcherPlugin = {
   },
 };
 
+const fs = require('fs');
+const path = require('path');
+
+function copyWasmFiles() {
+  const targetDir = path.join(__dirname, 'dist', 'wasm');
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const mainWasm = path.join(__dirname, 'node_modules', 'web-tree-sitter', 'tree-sitter.wasm');
+  if (fs.existsSync(mainWasm)) {
+    fs.copyFileSync(mainWasm, path.join(targetDir, 'tree-sitter.wasm'));
+  }
+
+  const wasmsDir = path.join(__dirname, 'node_modules', 'tree-sitter-wasms', 'out');
+  if (fs.existsSync(wasmsDir)) {
+    const files = fs.readdirSync(wasmsDir);
+    for (const file of files) {
+      if (file.endsWith('.wasm')) {
+        fs.copyFileSync(path.join(wasmsDir, file), path.join(targetDir, file));
+      }
+    }
+  }
+}
+
 /** @type {import('esbuild').BuildOptions[]} */
 const buildConfigs = [
   // 1. Extension Host (Node / CJS)
@@ -71,17 +96,18 @@ const buildConfigs = [
 
 async function main() {
   try {
+    copyWasmFiles();
     if (isWatch) {
-      console.log('⚡ Starting watch mode...');
+      console.log('Starting watch mode...');
       const contexts = await Promise.all(buildConfigs.map(cfg => esbuild.context(cfg)));
       await Promise.all(contexts.map(ctx => ctx.watch()));
     } else {
-      console.log('📦 Building extension and webview bundles...');
+      console.log('Building extension and webview bundles...');
       await Promise.all(buildConfigs.map(cfg => esbuild.build(cfg)));
-      console.log('✅ Build complete.');
+      console.log('Build complete.');
     }
   } catch (err) {
-    console.error('❌ Build failed:', err);
+    console.error('Build failed:', err);
     process.exit(1);
   }
 }

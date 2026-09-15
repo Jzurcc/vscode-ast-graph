@@ -40,16 +40,15 @@ The view can also be launched directly by clicking the graph icon in the editor 
 
 ## Supported Languages
 
-The extension currently ships with a built-in compiler pipeline for the Toy language (`.toy`):
+AST Graph provides native and WebAssembly-powered AST parsing across major programming languages:
 
-* Variable declarations (`let x = 10;`)
-* Reassignments (`x = x + 1;`)
-* Function declarations and calls (`fn square(n) { return n * n; }`)
-* Control flow (`if / else`, `while`)
-* Arithmetic and logical expressions with standard precedence
-* Built-in `print(...)` statement
-
-The modular domain architecture allows additional language parsers (e.g., JavaScript/TypeScript via Acorn or custom AST generators) to be plugged in by mapping to the shared AST interface.
+* JavaScript & TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`): Native AST and token stream extraction powered by the TypeScript compiler API.
+* Python (`.py`): WebAssembly Tree-sitter parser with functions, classes, decorators, and control flow.
+* C & C++ (`.c`, `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp`): Translation units, functions, structs, and preprocessor directives.
+* C# (`.cs`): Namespaces, classes, methods, and properties.
+* Rust (`.rs`), Go (`.go`), Java (`.java`), Ruby (`.rb`), PHP (`.php`), Bash (`.sh`): Native AST hierarchy via Tree-sitter WASM.
+* Data formats: JSON (`.json`), YAML (`.yaml`, `.yml`), TOML (`.toml`).
+* Toy Language (`.toy`): Built-in educational language with time-traveling stepped execution, live scope frames, expression evaluation badges, and terminal output.
 
 ## Architecture
 

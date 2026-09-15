@@ -3,6 +3,7 @@ import { Token } from '../domain/lexer/Token';
 import { Parser } from '../domain/parser/Parser';
 import { TreeWalkEngine } from '../domain/interpreter/TreeWalkEngine';
 import { TypeScriptAstAdapter } from '../domain/parser/TypeScriptAstAdapter';
+import { TreeSitterAstAdapter } from '../domain/parser/TreeSitterAstAdapter';
 import { ProgramNode } from '../shared/AstNodeTypes';
 import { StepSnapshot } from '../shared/StepSnapshot';
 import { SnapshotHistory } from './SnapshotHistory';
@@ -26,11 +27,11 @@ export class InterpreterSession {
     this.listeners = listeners;
   }
 
-  public loadSource(
+  public async loadSource(
     source: string,
     fileName = 'source.toy',
     languageId = 'toy'
-  ): { ast: any; tokens: Token[]; snapshots: StepSnapshot[]; executionTimeMs: number } | null {
+  ): Promise<{ ast: any; tokens: Token[]; snapshots: StepSnapshot[]; executionTimeMs: number } | null> {
     this.stopPlayback();
     const startTime = performance.now();
 
@@ -49,6 +50,18 @@ export class InterpreterSession {
     try {
       if (isJsOrTs) {
         const result = TypeScriptAstAdapter.parse(source, fileName);
+        this.program = result.ast;
+        this.history = new SnapshotHistory([]);
+        return {
+          ast: result.ast,
+          tokens: result.tokens,
+          snapshots: [],
+          executionTimeMs: result.executionTimeMs,
+        };
+      }
+
+      if (TreeSitterAstAdapter.isSupported(languageId, fileName)) {
+        const result = await TreeSitterAstAdapter.parse(source, languageId, fileName);
         this.program = result.ast;
         this.history = new SnapshotHistory([]);
         return {

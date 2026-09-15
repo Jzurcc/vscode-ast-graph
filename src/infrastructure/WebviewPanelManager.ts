@@ -13,7 +13,7 @@ export class WebviewPanelManager {
     this.extensionUri = extensionUri;
   }
 
-  public show(sourceCode: string, activeEditor: vscode.TextEditor | undefined): void {
+  public async show(sourceCode: string, activeEditor: vscode.TextEditor | undefined): Promise<void> {
     if (activeEditor) {
       this.targetUri = activeEditor.document.uri;
     }
@@ -77,8 +77,8 @@ export class WebviewPanelManager {
     if (this.session && this.bridge) {
       const fileName = activeEditor?.document.fileName ?? 'source.toy';
       const languageId = activeEditor?.document.languageId ?? 'toy';
-      const result = this.session.loadSource(sourceCode, fileName, languageId);
-      if (result) {
+      const result = await this.session.loadSource(sourceCode, fileName, languageId);
+      if (result && this.bridge) {
         this.bridge.postMessage({
           type: 'INIT_PROGRAM',
           payload: {

@@ -23,10 +23,10 @@ if (total > 10) {
 export function activate(context: vscode.ExtensionContext): void {
   const panelManager = new WebviewPanelManager(context.extensionUri);
 
-  const openVisualizer = () => {
+  const openVisualizer = async () => {
     const editor = vscode.window.activeTextEditor;
     const code = editor ? editor.document.getText() : DEFAULT_SAMPLE;
-    panelManager.show(code, editor);
+    await panelManager.show(code, editor);
   };
 
   const primaryCmd = vscode.commands.registerCommand('astGraph.view', openVisualizer);
