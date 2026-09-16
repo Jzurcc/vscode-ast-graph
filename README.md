@@ -1,5 +1,8 @@
 # AST Graph extension for Visual Studio Code
 
+<img width="256" height="256" alt="icon" src="https://github.com/user-attachments/assets/d94040d1-c216-4ff2-86c7-a0cc0f8d06f0" />
+
+
 View an interactive AST Graph of your code, step through execution with a time-traveling tree-walk interpreter, and inspect scopes, tokens, and runtime evaluation directly within Visual Studio Code.
 
 ![AST Graph Preview](resources/demo.gif)
